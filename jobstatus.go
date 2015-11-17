@@ -22,7 +22,7 @@ func (j Job) RedisKey(suffix string) string {
 }
 
 func (j Job) AppendLog(newLine string) (err error) {
-	err = RedisClient.Append(j.RedisKey("log"), newLine).Err()
+	err = RedisClient.Append(j.RedisKey("log"), newLine+"\n").Err()
 	if err != nil {
 		return
 	}
