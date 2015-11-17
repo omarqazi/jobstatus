@@ -21,6 +21,15 @@ func (j Job) RedisKey(suffix string) string {
 	return (j.RedisBase() + "-" + suffix)
 }
 
+func (j Job) AppendLog(newLine string) (err error) {
+	err = RedisClient.Append(j.RedisKey("log"),newLine).Err()
+	if err != nil {
+		return
+	}
+	err = RedisClient.Publish(j.RedisKey("updated-log"),newLine).Err()
+	return
+}
+
 type Status struct {
 	JobId string
 	Log string // The full log the job spit out
@@ -99,7 +108,7 @@ func (s Status) UpdateChannel() (chan Status) {
 	go func() {
 		defer close(updateChannel)
 		
-		pubsub, err := RedisClient.Subscribe(s.Job().RedisKey("updated"))
+		pubsub, err := RedisClient.PSubscribe(s.Job().RedisKey("updated*"))
 		if err != nil {
 			log.Println(err)
 			return
