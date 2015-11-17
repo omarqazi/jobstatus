@@ -2,8 +2,8 @@
 package jobstatus
 
 import (
-	"gopkg.in/redis.v3"
 	"github.com/bitly/go-simplejson"
+	"gopkg.in/redis.v3"
 	"log"
 )
 
@@ -22,21 +22,21 @@ func (j Job) RedisKey(suffix string) string {
 }
 
 func (j Job) AppendLog(newLine string) (err error) {
-	err = RedisClient.Append(j.RedisKey("log"),newLine).Err()
+	err = RedisClient.Append(j.RedisKey("log"), newLine).Err()
 	if err != nil {
 		return
 	}
-	err = RedisClient.Publish(j.RedisKey("updated-log"),newLine).Err()
+	err = RedisClient.Publish(j.RedisKey("updated-log"), newLine).Err()
 	return
 }
 
 type Status struct {
-	JobId string
-	Log string // The full log the job spit out
-	Complete int64 // How many parts are complete
-	Total int64 // How many parts total?
-	Message string // Summary of current status
-	State string // queued, started, error, or done
+	JobId    string
+	Log      string // The full log the job spit out
+	Complete int64  // How many parts are complete
+	Total    int64  // How many parts total?
+	Message  string // Summary of current status
+	State    string // queued, started, error, or done
 }
 
 func (s Status) Job() Job {
@@ -45,26 +45,26 @@ func (s Status) Job() Job {
 
 func (s Status) Save() error {
 	statusJson := simplejson.New()
-	statusJson.Set("message",s.Message)
-	statusJson.Set("state",s.State)
-	statusJson.Set("complete",s.Complete)
-	statusJson.Set("total",s.Total)
+	statusJson.Set("message", s.Message)
+	statusJson.Set("state", s.State)
+	statusJson.Set("complete", s.Complete)
+	statusJson.Set("total", s.Total)
 	bytes, err := statusJson.MarshalJSON()
 	if err != nil {
 		return err
 	}
-	
-	err = RedisClient.Set(s.Job().RedisKey("state"),string(bytes),0).Err()
+
+	err = RedisClient.Set(s.Job().RedisKey("state"), string(bytes), 0).Err()
 	if err != nil {
 		return err
 	}
-	
-	err = RedisClient.Set(s.Job().RedisKey("log"),s.Log,0).Err()
+
+	err = RedisClient.Set(s.Job().RedisKey("log"), s.Log, 0).Err()
 	if err != nil {
 		return err
 	}
-	
-	RedisClient.Publish(s.Job().RedisKey("updated"),string(bytes))
+
+	RedisClient.Publish(s.Job().RedisKey("updated"), string(bytes))
 	return nil
 }
 
@@ -82,7 +82,7 @@ func (s *Status) Read() error {
 		if err != nil {
 			return err
 		}
-		
+
 		s.Message, err = pjson.Get("message").String()
 		s.State, err = pjson.Get("state").String()
 		s.Complete, err = pjson.Get("complete").Int64()
@@ -93,28 +93,28 @@ func (s *Status) Read() error {
 	} else { // on error, returne rror
 		return err
 	}
-	
+
 	s.Log, err = RedisClient.Get(j.RedisKey("log")).Result()
 	if err == redis.Nil { // If log is nil
 		s.Log = "" // Initialize to blank string
-		err = nil // and don't return that as an error
+		err = nil  // and don't return that as an error
 	}
 	return err
 }
 
-func (s Status) UpdateChannel() (chan Status) {
-	updateChannel := make(chan Status,1)
-	
+func (s Status) UpdateChannel() chan Status {
+	updateChannel := make(chan Status, 1)
+
 	go func() {
 		defer close(updateChannel)
-		
+
 		pubsub, err := RedisClient.PSubscribe(s.Job().RedisKey("updated*"))
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		
-		updateChannel <- s		
+
+		updateChannel <- s
 		_, err = pubsub.ReceiveMessage()
 		if err != nil {
 			log.Println(err)
@@ -126,12 +126,11 @@ func (s Status) UpdateChannel() (chan Status) {
 		}
 		updateChannel <- s
 	}()
-	
+
 	return updateChannel
 }
 func (j *Job) GetStatus() (Status, error) {
 	s := Status{JobId: j.Id}
 	err := s.Read()
-	return s, err	
+	return s, err
 }
-
