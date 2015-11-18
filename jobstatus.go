@@ -115,16 +115,18 @@ func (s Status) UpdateChannel() chan Status {
 		}
 
 		updateChannel <- s
-		_, err = pubsub.ReceiveMessage()
-		if err != nil {
-			log.Println(err)
-			return
+		for {
+			_, err = pubsub.ReceiveMessage()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			if err := s.Read(); err != nil {
+				log.Println(err)
+				return
+			}
+			updateChannel <- s
 		}
-		if err := s.Read(); err != nil {
-			log.Println(err)
-			return
-		}
-		updateChannel <- s
 	}()
 
 	return updateChannel
