@@ -102,8 +102,9 @@ func (s *Status) Read() error {
 	return err
 }
 
-func (s Status) UpdateChannel() chan Status {
+func (s Status) UpdateChannel() (chan Status, chan int) {
 	updateChannel := make(chan Status, 1)
+	cancelChannel := make(chan int,1)
 
 	go func() {
 		defer close(updateChannel)
@@ -113,9 +114,13 @@ func (s Status) UpdateChannel() chan Status {
 			log.Println(err)
 			return
 		}
+		defer pubsub.Close()
 
 		updateChannel <- s
 		for {
+			if cancelVal := <-cancelChannel; cancelVal == 1 {
+				return
+			}
 			_, err = pubsub.ReceiveMessage()
 			if err != nil {
 				log.Println(err)
@@ -125,16 +130,15 @@ func (s Status) UpdateChannel() chan Status {
 				log.Println(err)
 				return
 			}
-
+			
 			select {
 			case updateChannel <- s:
 			default:
-				return
 			}
 		}
 	}()
 
-	return updateChannel
+	return updateChannel, cancelChannel
 }
 func (j *Job) GetStatus() (Status, error) {
 	s := Status{JobId: j.Id}
