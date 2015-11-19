@@ -125,7 +125,12 @@ func (s Status) UpdateChannel() chan Status {
 				log.Println(err)
 				return
 			}
-			updateChannel <- s
+
+			select {
+			case updateChannel <- s:
+			default:
+				return
+			}
 		}
 	}()
 
